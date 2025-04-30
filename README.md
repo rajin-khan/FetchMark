@@ -1,4 +1,4 @@
-# FetchMark 🐾
+# FetchMark 🐾 (DEVELOPMENT IN PROGRESS)
 
 **Tagline:** "Just ask — your bookmarks remember."
 
