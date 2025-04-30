@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FetchMark</title>
+    <!-- Load Tailwind first -->
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <!-- Then custom styles -->
+    <link href="popup.css" rel="stylesheet">
+</head>
+<body class="dark bg-slate-900 text-slate-200 font-sans text-sm overflow-hidden" style="width: 380px; height: 500px;">
+
+    <!-- Container for the entire app content -->
+    <div id="appContainer" class="flex flex-col h-full">
+
+        <!-- == ONBOARDING VIEW == -->
+        <div id="onboardingView" class="flex-grow flex flex-col p-6 space-y-6 hidden animate-fade-in">
+            <!-- Step 1 -->
+            <div id="onboardingStep1" class="flex-grow flex flex-col justify-between">
+                <div>
+                    <div class="flex items-center space-x-2 mb-6">
+                        <img src="assets/logo.svg" alt="FetchMark Logo" class="w-8 h-8 drop-shadow-md">
+                        <h1 class="text-2xl font-bold text-slate-100">Welcome to FetchMark! 🐾</h1>
+                    </div>
+                    <p class="text-slate-300 mb-4">Ready to ask your bookmarks questions?</p>
+                    <p class="text-slate-300 mb-2">First, FetchMark needs a <strong class="text-cyan-400">free Groq API key</strong> to understand you.</p>
+                    <p class="text-sm text-slate-400 mb-5">It uses fast AI models like Llama 3!</p>
+                    <a href="https://console.groq.com/keys" target="_blank" class="inline-block px-5 py-2.5 bg-cyan-600 hover:bg-cyan-700 text-white rounded-md font-medium shadow hover:shadow-md transition-all duration-200 text-center text-sm">
+                        Get Free Groq API Key
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 inline-block ml-1 -mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                        </svg>
+                    </a>
+                    <p class="text-xs text-slate-500 mt-3">Your key stays safe <span title="In chrome.storage.local">on your device</span>.</p>
+                </div>
+                <button id="nextStep1Btn" class="w-full mt-6 px-4 py-2.5 bg-slate-700 hover:bg-slate-600 text-slate-100 rounded-md font-medium transition-colors duration-200">Got my key!</button>
+            </div>
+            
+            <!-- Step 2 -->
+            <div id="onboardingStep2" class="flex-grow flex flex-col justify-between hidden">
+                <div>
+                    <div class="flex items-center space-x-2 mb-6">
+                        <img src="assets/logo.svg" alt="FetchMark Logo" class="w-8 h-8 drop-shadow-md">
+                        <h1 class="text-2xl font-bold text-slate-100">Great! Last step...</h1>
+                    </div>
+                    <label for="onboardingGroqApiKey" class="block text-sm font-medium text-slate-300 mb-2">Paste your Groq API Key here:</label>
+                    <input type="password" id="onboardingGroqApiKey" placeholder="gsk_..." class="w-full px-4 py-2.5 border border-slate-700 rounded-md bg-slate-800 text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent shadow-sm transition">
+                    <p id="apiKeyError" class="text-red-400 text-xs mt-2 hidden">Hmm, that doesn't look like a Groq key (should start with gsk_).</p>
+                </div>
+                <div class="flex space-x-3 mt-6">
+                    <button id="backStep2Btn" class="w-1/3 px-4 py-2.5 bg-slate-700 hover:bg-slate-600 text-slate-100 rounded-md font-medium transition-colors duration-200 text-sm">Back</button>
+                    <button id="saveApiKeyBtn" class="w-2/3 px-4 py-2.5 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white rounded-md font-medium shadow-md hover:shadow-lg transition-all duration-200 ease-out">Let's Go! ✨</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- == MAIN APP VIEW == -->
+        <div id="mainAppView" class="flex flex-col h-full p-4 hidden animate-fade-in">
+            <!-- Header -->
+            <div class="flex justify-between items-center mb-4 flex-shrink-0">
+                <div class="flex items-center space-x-2">
+                    <img src="assets/logo.svg" alt="FetchMark Logo" class="w-7 h-7 drop-shadow-sm">
+                    <h1 class="text-xl font-bold text-slate-100">FetchMark</h1>
+                </div>
+                <div class="flex space-x-2">
+                    <button id="settingsBtn" title="Settings" class="p-2 rounded-full hover:bg-slate-700 transition-colors duration-200">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                    </button>
+                    <button id="refreshBtnApp" title="Re-sniff Bookmarks" class="p-2 rounded-full hover:bg-slate-700 transition-colors duration-200">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m-15.357-2a8.001 8.001 0 0015.357 2M9 21h-.581" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Results Area -->
+            <div id="resultsWrapperApp" class="flex-grow overflow-y-auto mb-4 pr-1 custom-scrollbar-dark">
+                <!-- Status Message Area -->
+                <div id="statusMessageApp" class="text-center text-slate-400 py-10 px-6">
+                    <span class="text-2xl block mb-2">🐾</span>
+                    What bookmarks can I fetch for you today?
+                </div>
+                <!-- Loading Skeletons -->
+                <div id="loaderApp" class="space-y-3 hidden p-1">
+                    <div class="skeleton-card-dark"></div>
+                    <div class="skeleton-card-dark"></div>
+                    <div class="skeleton-card-dark"></div>
+                </div>
+                <!-- Actual Results Container -->
+                <div id="resultsApp" class="space-y-3 p-1">
+                    <!-- Results will be dynamically inserted here -->
+                </div>
+            </div>
+
+            <!-- Input Area -->
+            <div class="flex-shrink-0 border-t border-slate-700 pt-3">
+                <form id="searchFormApp" class="flex items-center space-x-2">
+                    <input type="text" id="searchInputApp" placeholder="Ask me about your bookmarks..." class="flex-grow px-4 py-3 border border-slate-700 rounded-full bg-slate-800 text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent shadow-sm transition" autocomplete="off">
+                    <button type="submit" id="askButtonApp" class="ask-button p-3 bg-gradient-to-br from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white rounded-full shadow-md hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cyan-500 focus:ring-offset-slate-900 transition-all duration-200 ease-out transform hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:scale-100" title="Ask FetchMark!">
+                        <!-- Static Paw Icon -->
+                        <svg id="askIconPaw" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M17.657 10.657C18.48 9.833 19 8.73 19 7.5C19 5.57 17.43 4 15.5 4C14.27 4 13.167 4.52 12.343 5.343M6.343 10.657C5.52 9.833 5 8.73 5 7.5C5 5.57 6.57 4 8.5 4C9.73 4 10.833 4.52 11.657 5.343M12 15.5C14.485 15.5 16.5 13.485 16.5 11C16.5 8.515 14.485 6.5 12 6.5C9.515 6.5 7.5 8.515 7.5 11C7.5 13.485 9.515 15.5 12 15.5ZM12 15.5V20M9 17h6" />
+                        </svg>
+                        <!-- Loading Spinner Icon -->
+                        <svg id="askIconSpinner" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 icon animate-spin hidden" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- == SETTINGS VIEW == -->
+        <div id="settingsView" class="flex flex-col h-full p-4 hidden animate-fade-in">
+            <!-- Settings Header -->
+            <div class="flex justify-between items-center mb-6 flex-shrink-0">
+                <div class="flex items-center space-x-2">
+                    <button id="backFromSettingsBtn" class="p-1 rounded-full hover:bg-slate-700 transition-colors duration-200">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
+                        </svg>
+                    </button>
+                    <h1 class="text-xl font-bold text-slate-100">Settings</h1>
+                </div>
+            </div>
+
+            <!-- Settings Content -->
+            <div class="flex-grow overflow-y-auto custom-scrollbar-dark">
+                <div class="space-y-6">
+                    <!-- API Key Section -->
+                    <div class="bg-slate-800 rounded-lg p-4 shadow-md">
+                        <h2 class="text-lg font-semibold text-slate-100 mb-3">API Settings</h2>
+                        <div class="space-y-4">
+                            <div>
+                                <label for="groqApiKey" class="block text-sm font-medium text-slate-300 mb-2">Groq API Key</label>
+                                <div class="flex">
+                                    <input type="password" id="groqApiKey" placeholder="gsk_..." class="flex-grow px-3 py-2 border border-slate-700 rounded-l-md bg-slate-800 text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent shadow-sm transition">
+                                    <button id="toggleKeyVisibilityBtn" class="px-3 py-2 bg-slate-700 rounded-r-md border border-slate-700 hover:bg-slate-600 transition-colors">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                        </svg>
+                                    </button>
+                                </div>
+                                <p class="text-xs text-slate-500 mt-1">Get a free key at <a href="https://console.groq.com/keys" target="_blank" class="text-cyan-400 hover:underline">console.groq.com</a></p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Cache Settings -->
+                    <div class="bg-slate-800 rounded-lg p-4 shadow-md">
+                        <h2 class="text-lg font-semibold text-slate-100 mb-3">Cache Settings</h2>
+                        <div class="space-y-4">
+                            <div>
+                                <div class="flex items-center justify-between">
+                                    <span class="text-sm text-slate-300">Refresh bookmarks cache</span>
+                                    <button id="clearCacheBtn" class="px-3 py-1.5 text-sm bg-slate-700 rounded-md hover:bg-slate-600 transition-colors">Clear Now</button>
+                                </div>
+                                <p class="text-xs text-slate-500 mt-1">Bookmarks are cached for 15 minutes by default</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- About Section -->
+                    <div class="bg-slate-800 rounded-lg p-4 shadow-md">
+                        <h2 class="text-lg font-semibold text-slate-100 mb-2">About FetchMark</h2>
+                        <p class="text-sm text-slate-400 mb-2">Version 1.0.0</p>
+                        <p class="text-xs text-slate-500">FetchMark uses AI to help you fetch and search your bookmarks with natural language.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Save Settings Button -->
+            <div class="flex-shrink-0 mt-4">
+                <button id="saveSettingsBtn" class="w-full px-4 py-2.5 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white rounded-md font-medium shadow hover:shadow-md transition-all duration-200">Save Settings</button>
+            </div>
+        </div>
+
+    </div> <!-- End #appContainer -->
+
+    <script src="utils.js"></script>
+    <script src="bookmarks.js"></script>
+    <script src="query.js"></script>
+    <script src="popup.js"></script>
+</body>
+</html>
