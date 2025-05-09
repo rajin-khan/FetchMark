@@ -3,7 +3,11 @@
 // --- Constants ---
 const STORAGE_KEYS = {
     ONBOARDING_COMPLETE: 'fetchmark_onboarding_complete_v1',
-    GROQ_API_KEY: 'groqApiKey', // Re-use key used by query.js
+    SEARCH_PROVIDER: 'searchProvider',
+    GROQ_API_KEY: 'groqApiKey',
+    HF_API_KEY: 'hfApiKey',
+    OLLAMA_MODEL: 'ollamaModel',
+    LAST_SEARCH_QUERY: 'fetchmark_last_search_query',
     // Add other keys if needed later
 };
 
@@ -38,8 +42,21 @@ const settingsBtn = document.getElementById('settingsBtn'); // Button to open se
 
 // Settings Elements
 const backFromSettingsBtn = document.getElementById('backFromSettingsBtn');
-const settingsGroqApiKeyInput = document.getElementById('groqApiKey'); // Input within settings view
-const toggleKeyVisibilityBtn = document.getElementById('toggleKeyVisibilityBtn');
+const searchProviderSelect = document.getElementById('searchProviderSelect');
+
+const groqSettingsDiv = document.getElementById('groqSettingsDiv');
+const settingsGroqApiKeyInput = document.getElementById('settingsGroqApiKey'); 
+const toggleGroqKeyVisibilityBtn = document.getElementById('toggleGroqKeyVisibilityBtn');
+
+const hfSettingsDiv = document.getElementById('hfSettingsDiv');
+const settingsHfApiKeyInput = document.getElementById('settingsHfApiKey');
+const toggleHfKeyVisibilityBtn = document.getElementById('toggleHfKeyVisibilityBtn');
+
+const ollamaSettingsDiv = document.getElementById('ollamaSettingsDiv');
+const settingsOllamaModelInput = document.getElementById('settingsOllamaModel');
+const testOllamaBtn = document.getElementById('testOllamaBtn');
+const ollamaTestResultMsg = document.getElementById('ollamaTestResultMsg');
+
 const clearCacheBtn = document.getElementById('clearCacheBtn');
 const saveSettingsBtn = document.getElementById('saveSettingsBtn');
 
@@ -62,18 +79,28 @@ async function initializePopup() {
     try {
         const result = await chrome.storage.local.get([
             STORAGE_KEYS.ONBOARDING_COMPLETE,
-            STORAGE_KEYS.GROQ_API_KEY
+            STORAGE_KEYS.GROQ_API_KEY,
+            STORAGE_KEYS.SEARCH_PROVIDER
         ]);
 
         const onboardingComplete = result[STORAGE_KEYS.ONBOARDING_COMPLETE] === true;
-        const apiKey = result[STORAGE_KEYS.GROQ_API_KEY];
+        const groqApiKey = result[STORAGE_KEYS.GROQ_API_KEY];
+        const searchProvider = result[STORAGE_KEYS.SEARCH_PROVIDER];
 
-        if (onboardingComplete && apiKey) {
-            console.log('Onboarding complete and API key found. Showing main app.');
+        if (onboardingComplete && groqApiKey && searchProvider) { // Check for provider too
+            console.log('Onboarding complete, API key and provider found. Showing main app.');
             showView('main'); // Show main app
             await setupMainApp(); // Load bookmarks etc.
+        } else if (onboardingComplete && !groqApiKey && searchProvider !== 'ollama' && searchProvider !== 'hf'){
+            // Onboarding done, but Groq key might have been removed, and provider is Groq or not set
+            console.log('Onboarding complete but Groq API key missing. Redirecting to settings.');
+            showView('settings');
+        } else if (onboardingComplete && searchProvider) {
+             console.log('Onboarding complete, provider set. Showing main app (might need specific setup for HF/Ollama if keys are missing).');
+             showView('main');
+             await setupMainApp();
         } else {
-            console.log('Needs onboarding or API key.');
+            console.log('Needs onboarding or essential settings.');
             showView('onboarding'); // Show onboarding
         }
     } catch (error) {
@@ -102,9 +129,17 @@ function showView(viewName, onboardingStep = 1) {
     switch (viewName) {
         case 'onboarding':
             onboardingView.classList.remove('hidden');
-            onboardingStep1.classList.toggle('hidden', onboardingStep !== 1);
-            onboardingStep2.classList.toggle('hidden', onboardingStep !== 2);
-            if (onboardingStep === 2) onboardingGroqApiKeyInput.focus();
+            if (onboardingStep1 && onboardingStep2) { // Ensure elements exist
+                onboardingStep1.classList.toggle('visible-step', onboardingStep === 1);
+                onboardingStep1.classList.toggle('hidden-step', onboardingStep !== 1);
+                onboardingStep2.classList.toggle('visible-step', onboardingStep === 2);
+                onboardingStep2.classList.toggle('hidden-step', onboardingStep !== 2);
+                
+                if (onboardingStep === 2) {
+                    // Delay focus slightly to allow transition to complete
+                    setTimeout(() => onboardingGroqApiKeyInput?.focus(), 300); 
+                }
+            }
             break;
         case 'settings':
             settingsView.classList.remove('hidden');
@@ -122,14 +157,21 @@ function showView(viewName, onboardingStep = 1) {
 
 if (nextStep1Btn) {
     nextStep1Btn.addEventListener('click', () => {
-        showView('onboarding', 2); // Go to step 2
+        if (onboardingStep1 && onboardingStep2) {
+            onboardingStep1.classList.replace('visible-step', 'hidden-step');
+            onboardingStep2.classList.replace('hidden-step', 'visible-step');
+            setTimeout(() => onboardingGroqApiKeyInput?.focus(), 300); // Focus after transition
+        }
     });
 }
 
 if (backStep2Btn) {
     backStep2Btn.addEventListener('click', () => {
-        apiKeyErrorMsg.classList.add('hidden'); // Hide error when going back
-        showView('onboarding', 1); // Go back to step 1
+        if (onboardingStep1 && onboardingStep2) {
+            apiKeyErrorMsg.classList.add('hidden'); // Hide error when going back
+            onboardingStep2.classList.replace('visible-step', 'hidden-step');
+            onboardingStep1.classList.replace('hidden-step', 'visible-step');
+        }
     });
 }
 
@@ -156,10 +198,10 @@ if (saveApiKeyBtn) {
             await chrome.storage.local.set({
                 [STORAGE_KEYS.GROQ_API_KEY]: apiKey,
                 [STORAGE_KEYS.ONBOARDING_COMPLETE]: true,
-                'searchProvider': 'groq' // Default provider
+                [STORAGE_KEYS.SEARCH_PROVIDER]: 'groq' // Default provider
             });
 
-            console.log('API Key saved, onboarding complete.');
+            console.log('API Key saved, onboarding complete, provider set to Groq.');
             await new Promise(resolve => setTimeout(resolve, 300));
 
             // Transition to main app view and set it up
@@ -184,12 +226,27 @@ if (saveApiKeyBtn) {
 async function setupMainApp() {
      console.log("Setting up main app view...");
      showStatusApp("Let me check your bookmarks...", 'info');
+     
+     // Load last search query
+    try {
+        const result = await chrome.storage.local.get(STORAGE_KEYS.LAST_SEARCH_QUERY);
+        if (result[STORAGE_KEYS.LAST_SEARCH_QUERY] && searchInputApp) {
+            searchInputApp.value = result[STORAGE_KEYS.LAST_SEARCH_QUERY];
+            currentSearchTerm = result[STORAGE_KEYS.LAST_SEARCH_QUERY]; // Also update state if needed
+        }
+    } catch (error) {
+        console.warn("Could not load last search query:", error);
+    }
+
      await loadBookmarksApp();
-     showStatusApp(
-         allBookmarks.length > 0 ? '<span class="text-2xl block mb-2">🐾</span>What bookmarks can I fetch for you today?' : '<span class="text-2xl block mb-2">🤔</span>Looks like you have no bookmarks yet! Add some first.',
-         'info',
-         true // Allow HTML
-     );
+     // Determine initial status message after bookmarks (and possibly last query) are loaded
+    if (resultsContainerApp && resultsContainerApp.children.length === 0) { // Only set default if no results shown
+        showStatusApp(
+            allBookmarks.length > 0 ? '<span class="text-2xl block mb-2">🐾</span>What bookmarks can I fetch for you today?' : '<span class="text-2xl block mb-2">🤔</span>Looks like you have no bookmarks yet! Add some first.',
+            'info',
+            true // Allow HTML
+        );
+    }
 
      // Attach listeners only once
      if (!mainAppView.dataset.listenersAttached) {
@@ -281,10 +338,14 @@ function renderResultsApp(results) {
 async function loadBookmarksApp(forceRefresh = false) {
      if (isLoading && !forceRefresh) return;
      let statusWasShown = false;
-     if (forceRefresh) {
-         showStatusApp('Re-sniffing your bookmarks...', 'info');
-         statusWasShown = true;
+
+     if (forceRefresh && refreshBtnApp) {
+        refreshBtnApp.classList.add('refreshing');
+        refreshBtnApp.disabled = true;
+        showStatusApp('Re-sniffing your bookmarks...', 'info');
+        statusWasShown = true;
      }
+
      try {
          allBookmarks = await getBookmarks(forceRefresh); // Uses bookmarks.js
          console.log(`Loaded ${allBookmarks.length} bookmarks.`);
@@ -302,14 +363,34 @@ async function loadBookmarksApp(forceRefresh = false) {
          console.error("Failed to load bookmarks:", error);
          showStatusApp(`Ruh roh! Couldn't load bookmarks: ${error.message}`, 'error');
          allBookmarks = [];
+     } finally {
+        if (forceRefresh && refreshBtnApp) {
+            refreshBtnApp.classList.remove('refreshing');
+            refreshBtnApp.disabled = false;
+        }
      }
 }
 
 /** Handles search submission */
 async function handleSearchApp(query) {
-    query = query.trim(); currentSearchTerm = query;
+    query = query.trim(); 
     if (!isReady) { console.warn("Search attempted before init."); return; }
-    if (!query || query.length < 3) { resultsContainerApp.innerHTML = ''; showStatusApp(query ? 'Need a bit more to search for!' : '<span class="text-2xl block mb-2">🐾</span>What bookmarks can I fetch?', 'info', true); return; }
+    
+    currentSearchTerm = query; // Update current search term
+    // Save the current search term
+    try {
+        if (query) { // Only save non-empty queries
+            await chrome.storage.local.set({ [STORAGE_KEYS.LAST_SEARCH_QUERY]: query });
+        }
+    } catch (error) {
+        console.warn("Could not save last search query:", error);
+    }
+
+    if (!query || query.length < 3) { 
+        resultsContainerApp.innerHTML = ''; 
+        showStatusApp(query ? 'Need a bit more to search for!' : '<span class="text-2xl block mb-2">🐾</span>What bookmarks can I fetch?', 'info', true); 
+        return; 
+    }
     if (isLoading) return;
     if (allBookmarks.length === 0) {
         showStatusApp("Checking bookmarks first...", 'info'); await loadBookmarksApp();
@@ -329,7 +410,24 @@ async function handleSearchApp(query) {
             showStatusApp(`Oops! Fetch failed: ${message}. Maybe check API key in settings?`, 'error');
         } else if (results.length === 0) {
             renderResultsApp([]);
-            showStatusApp(`Hmm, couldn't sniff out any bookmarks for "${query}". Try asking differently?`, 'info');
+            const noResultsHTML = `
+                <div class="text-center py-8">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="mx-auto h-12 w-12 text-slate-500 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9 5.25h.008v.008H12v-.008z" />
+                    </svg>
+                    <p class="text-lg font-semibold text-slate-300 mb-1">No barks for "<span class="italic text-cyan-400">${currentSearchTerm}</span>"!</p>
+                    <p class="text-sm text-slate-400 mb-4">Try a different scent (rephrase your query) or check if your bookmarks need a refresh.</p>
+                    <button id="quickRefreshBtn" class="px-4 py-2 text-sm bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-md transition-colors duration-150">Re-sniff Bookmarks</button>
+                </div>
+            `;
+            showStatusApp(noResultsHTML, 'info', true);
+            // Add event listener for the new button if it exists
+            const quickRefresh = document.getElementById('quickRefreshBtn');
+            if (quickRefresh) {
+                quickRefresh.addEventListener('click', () => {
+                    if (isReady) loadBookmarksApp(true); // Force refresh
+                });
+            }
         } else {
             showStatusApp('');
             renderResultsApp(results);
@@ -347,23 +445,59 @@ async function handleSearchApp(query) {
 /** Loads current Groq API key into the settings view input */
 async function loadSettingsIntoView() {
     try {
-        const result = await chrome.storage.local.get(STORAGE_KEYS.GROQ_API_KEY);
+        const result = await chrome.storage.local.get([
+            STORAGE_KEYS.SEARCH_PROVIDER,
+            STORAGE_KEYS.GROQ_API_KEY,
+            STORAGE_KEYS.HF_API_KEY,
+            STORAGE_KEYS.OLLAMA_MODEL
+        ]);
+
+        const provider = result[STORAGE_KEYS.SEARCH_PROVIDER] || 'groq'; // Default to groq
+        if (searchProviderSelect) {
+            searchProviderSelect.value = provider;
+            searchProviderSelect.classList.add('provider-active'); // Emphasize the loaded provider
+        }
         if (settingsGroqApiKeyInput) {
             settingsGroqApiKeyInput.value = result[STORAGE_KEYS.GROQ_API_KEY] || '';
-            settingsGroqApiKeyInput.type = 'password'; // Ensure it starts hidden
+            settingsGroqApiKeyInput.type = 'password'; 
         }
+        if (settingsHfApiKeyInput) {
+            settingsHfApiKeyInput.value = result[STORAGE_KEYS.HF_API_KEY] || '';
+            settingsHfApiKeyInput.type = 'password';
+        }
+        if (settingsOllamaModelInput) settingsOllamaModelInput.value = result[STORAGE_KEYS.OLLAMA_MODEL] || 'mistral';
+
+        updateVisibleSettings(provider); // Show/hide based on loaded provider
+
     } catch (error) {
         console.error("Error loading settings:", error);
-        // Optionally show an error message within settings view
+        showToast("Error loading settings.", true);
     }
 }
 
-/** Toggles visibility of the API key in settings */
-function toggleKeyVisibility() {
-    if (!settingsGroqApiKeyInput) return;
-    const currentType = settingsGroqApiKeyInput.type;
-    settingsGroqApiKeyInput.type = currentType === 'password' ? 'text' : 'password';
-    // Optional: Change eye icon based on visibility state
+/** Updates which provider-specific settings are visible */
+function updateVisibleSettings(provider) {
+    if (!groqSettingsDiv || !hfSettingsDiv || !ollamaSettingsDiv) return;
+
+    groqSettingsDiv.classList.add('hidden');
+    hfSettingsDiv.classList.add('hidden');
+    ollamaSettingsDiv.classList.add('hidden');
+
+    if (provider === 'groq') {
+        groqSettingsDiv.classList.remove('hidden');
+    } else if (provider === 'hf') {
+        hfSettingsDiv.classList.remove('hidden');
+    } else if (provider === 'ollama') {
+        ollamaSettingsDiv.classList.remove('hidden');
+    }
+}
+
+/** Toggles visibility of an API key input field */
+function toggleGenericKeyVisibility(inputElement) {
+    if (!inputElement) return;
+    const currentType = inputElement.type;
+    inputElement.type = currentType === 'password' ? 'text' : 'password';
+    // TODO: Consider changing SVG icon for eye slash/open if desired
 }
 
 /** Clears the bookmark cache */
@@ -373,23 +507,73 @@ async function clearBookmarkCache() {
         allBookmarks = []; // Clear in-memory cache too
         console.log("Bookmark cache cleared.");
         showToast("Bookmark cache cleared!");
-        // Optionally trigger a background refresh immediately
-        // loadBookmarksApp(true);
     } catch (error) {
         console.error("Error clearing cache:", error);
         showToast("Failed to clear cache.", true);
     }
 }
 
-/** Saves settings (currently just API key) */
-async function saveSettings() {
-    if (!settingsGroqApiKeyInput) return;
-    const apiKey = settingsGroqApiKeyInput.value.trim();
+/** Tests Ollama Connection */
+async function testOllamaConnectionUI() {
+    if (!settingsOllamaModelInput || !ollamaTestResultMsg || !testOllamaBtn) return;
+    const modelName = settingsOllamaModelInput.value.trim();
+    if (!modelName) {
+        ollamaTestResultMsg.textContent = "Please enter a model name.";
+        ollamaTestResultMsg.className = 'text-xs text-yellow-400 mt-1 text-center';
+        return;
+    }
 
-    // Basic validation
-    if (!apiKey || !apiKey.startsWith('gsk_')) {
-        showToast("Invalid Groq API key format.", true);
+    testOllamaBtn.disabled = true;
+    testOllamaBtn.textContent = 'Testing...';
+    ollamaTestResultMsg.textContent = "Pinging local Ollama...";
+    ollamaTestResultMsg.className = 'text-xs text-slate-400 mt-1 text-center';
+
+    try {
+        // Ensure query.js's testOllamaConnection is available
+        if (typeof testOllamaConnection !== 'function') {
+            throw new Error("testOllamaConnection function not found. Is query.js loaded?");
+        }
+        const { success, message } = await testOllamaConnection(modelName);
+        if (success) {
+            ollamaTestResultMsg.textContent = message || "Connection successful!";
+            ollamaTestResultMsg.className = 'text-xs text-green-400 mt-1 text-center';
+        } else {
+            ollamaTestResultMsg.textContent = message || "Connection failed. See console.";
+            ollamaTestResultMsg.className = 'text-xs text-red-400 mt-1 text-center';
+        }
+    } catch (error) {
+        console.error("Ollama test UI error:", error);
+        ollamaTestResultMsg.textContent = `Error: ${error.message}`;
+        ollamaTestResultMsg.className = 'text-xs text-red-400 mt-1 text-center';
+    } finally {
+        testOllamaBtn.disabled = false;
+        testOllamaBtn.textContent = 'Test Ollama Connection';
+    }
+}
+
+/** Saves all settings */
+async function saveSettings() {
+    if (!searchProviderSelect || !settingsGroqApiKeyInput || !settingsHfApiKeyInput || !settingsOllamaModelInput || !saveSettingsBtn) return;
+
+    const selectedProvider = searchProviderSelect.value;
+    const groqKey = settingsGroqApiKeyInput.value.trim();
+    const hfKey = settingsHfApiKeyInput.value.trim();
+    const ollamaModel = settingsOllamaModelInput.value.trim();
+
+    // Validation
+    if (selectedProvider === 'groq' && (!groqKey || !groqKey.startsWith('gsk_'))) {
+        showToast("Invalid Groq API key format (must start with gsk_).", true);
         settingsGroqApiKeyInput.focus();
+        return;
+    }
+    if (selectedProvider === 'hf' && hfKey && !hfKey.startsWith('hf_')) {
+        showToast("Invalid Hugging Face API key format (should start with hf_).", true);
+        settingsHfApiKeyInput.focus();
+        return;
+    }
+    if (selectedProvider === 'ollama' && !ollamaModel) {
+        showToast("Ollama model name cannot be empty.", true);
+        settingsOllamaModelInput.focus();
         return;
     }
 
@@ -397,13 +581,20 @@ async function saveSettings() {
     saveSettingsBtn.disabled = true;
 
     try {
-        await chrome.storage.local.set({ [STORAGE_KEYS.GROQ_API_KEY]: apiKey });
-        console.log('API Key updated via settings.');
+        await chrome.storage.local.set({
+            [STORAGE_KEYS.SEARCH_PROVIDER]: selectedProvider,
+            [STORAGE_KEYS.GROQ_API_KEY]: groqKey,
+            [STORAGE_KEYS.HF_API_KEY]: hfKey,
+            [STORAGE_KEYS.OLLAMA_MODEL]: ollamaModel
+        });
+        console.log('Settings saved:', { provider: selectedProvider, groqKey: groqKey ? 'set' : 'not set', hfKey: hfKey ? 'set' : 'not set', ollamaModel });
+        
+        if(searchProviderSelect) searchProviderSelect.classList.add('provider-active'); // Re-apply emphasis after save
+
         saveSettingsBtn.textContent = 'Saved!';
         setTimeout(() => {
             saveSettingsBtn.textContent = 'Save Settings';
             saveSettingsBtn.disabled = false;
-             // Optionally close settings after save: showView('main');
         }, 1500);
         showToast("Settings saved successfully!");
 
@@ -414,6 +605,7 @@ async function saveSettings() {
         saveSettingsBtn.disabled = false;
     }
 }
+
 
 /** Shows a temporary toast notification */
 function showToast(message, isError = false) {
@@ -429,11 +621,11 @@ function showToast(message, isError = false) {
 
     toast.textContent = message;
     // Apply base and type-specific styles
-    toast.className = 'toast-notification fixed bottom-5 left-1/2 transform -translate-x-1/2 p-3 rounded-md shadow-lg text-sm z-50';
+    toast.className = 'toast-notification'; // Base class is in CSS
     if (isError) {
-        toast.classList.add('bg-red-600', 'text-white');
+        toast.classList.add('toast-error');
     } else {
-        toast.classList.add('bg-green-600', 'text-white'); // Or use CSS variables
+        toast.classList.add('toast-success');
     }
 
     // Animate in
@@ -458,9 +650,23 @@ if (settingsBtn) {
 if (backFromSettingsBtn) {
     backFromSettingsBtn.addEventListener('click', () => showView('main'));
 }
-if (toggleKeyVisibilityBtn) {
-    toggleKeyVisibilityBtn.addEventListener('click', toggleKeyVisibility);
+
+// Settings specific listeners
+if (searchProviderSelect) {
+    searchProviderSelect.addEventListener('change', (event) => {
+        updateVisibleSettings(event.target.value);
+    });
 }
+if (toggleGroqKeyVisibilityBtn && settingsGroqApiKeyInput) {
+    toggleGroqKeyVisibilityBtn.addEventListener('click', () => toggleGenericKeyVisibility(settingsGroqApiKeyInput));
+}
+if (toggleHfKeyVisibilityBtn && settingsHfApiKeyInput) {
+    toggleHfKeyVisibilityBtn.addEventListener('click', () => toggleGenericKeyVisibility(settingsHfApiKeyInput));
+}
+if (testOllamaBtn) {
+    testOllamaBtn.addEventListener('click', testOllamaConnectionUI);
+}
+
 if (clearCacheBtn) {
     clearCacheBtn.addEventListener('click', clearBookmarkCache);
 }

@@ -83,14 +83,35 @@
     }
   }
   
-  /* General fade-in animation for views */
-  @keyframes fade-in {
-    from { opacity: 0; }
-    to { opacity: 1; }
+  /* General fade-in animation for views (main, settings, onboarding container) */
+  @keyframes view-fade-in {
+    from { opacity: 0; transform: scale(0.98); }
+    to { opacity: 1; transform: scale(1); }
   }
   
-  .animate-fade-in {
-    animation: fade-in 0.3s ease-out forwards;
+  .view-animate-fade-in {
+    animation: view-fade-in 0.25s ease-out forwards;
+    /* Ensure hidden views don't interfere before animation */
+    /* position: absolute; top:0; left:0; right:0; bottom:0; */ /* This might be too aggressive if views have different heights */
+  }
+  
+  /* Onboarding step transitions */
+  .onboarding-step {
+    transition: opacity 0.3s ease-out, transform 0.3s ease-out;
+    will-change: opacity, transform;
+  }
+
+  .onboarding-step.hidden-step {
+    opacity: 0;
+    transform: translateX(-20px); /* Slide out to the left */
+    position: absolute; /* Take out of flow when hidden to prevent scrollbars */
+    pointer-events: none;
+  }
+
+  .onboarding-step.visible-step {
+    opacity: 1;
+    transform: translateX(0); /* Slide in from the right or stay */
+    position: relative; /* Back in flow */
   }
   
   /* Ask Button Loading State */
@@ -117,26 +138,42 @@
     position: absolute; /* Hidden by default */
   }
   
-  /* Focus visible styles for dark mode */
+  /* Enhanced Focus visible styles for dark mode */
   *:focus-visible {
-    outline: 2px solid rgb(34 211 238); /* cyan-400 */
+    outline: 2px solid var(--accent-primary) !important; /* Use CSS variable, !important to override Tailwind if needed */
     outline-offset: 2px;
+    box-shadow: 0 0 0 3px rgba(6, 182, 212, 0.3); /* Softer outer glow */
   }
   
-  /* Remove default browser focus outline if using custom */
+  /* Remove default browser focus outline if using custom for non-focus-visible capable browsers or specific needs */
   *:focus {
-    outline: none;
+    outline: none; /* Generally okay if :focus-visible is well defined */
   }
   
-  /* Input field enhancements */
+  /* Input field and Select enhancements */
   input[type="text"],
-  input[type="password"] {
+  input[type="password"],
+  select {
     transition: all 0.2s ease;
+    border-color: var(--dark-border);
   }
   
   input[type="text"]:focus,
-  input[type="password"]:focus {
+  input[type="password"]:focus,
+  select:focus {
+    border-color: var(--accent-primary);
     box-shadow: 0 0 0 2px rgba(6, 182, 212, 0.5); /* cyan-500 with opacity */
+  }
+
+  /* Style for the active search provider dropdown */
+  #searchProviderSelect.provider-active {
+    border-color: var(--accent-primary);
+    /* box-shadow: 0 0 0 1px var(--accent-primary); // Optional: subtle glow */
+  }
+  
+  #searchProviderSelect.provider-active:focus {
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 0 2px rgba(6, 182, 212, 0.5); /* Keep focus style consistent */
   }
   
   /* Status message enhancements */
@@ -156,11 +193,29 @@
   /* Settings view styling */
   #settingsView .bg-slate-800 {
     transition: transform 0.2s ease, box-shadow 0.2s ease;
+    border: 1px solid var(--dark-border); /* Add a subtle border to sections */
   }
   
   #settingsView .bg-slate-800:hover {
     transform: translateY(-1px);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    border-color: var(--dark-bg-tertiary);
+  }
+
+  #settingsView > div:first-child { /* Header */
+    margin-bottom: 1.25rem; /* Slightly more space below settings header */
+  }
+
+  #settingsView .space-y-6 > div:not(:last-child) { /* Space between setting cards */
+    margin-bottom: 1.5rem; 
+  }
+
+  /* Save Settings Button loading/saved state */
+  #saveSettingsBtn:disabled {
+    background-image: none; /* Remove gradient if it was there */
+    background-color: var(--dark-bg-tertiary); /* A slightly active disabled color */
+    opacity: 0.7;
+    cursor: wait; /* Indicate processing */
   }
   
   /* Button pulse animation for important actions */
@@ -180,19 +235,22 @@
     animation: button-pulse 1.5s infinite;
   }
   
-  /* Toast notification styling */
+  /* Enhanced Toast notification styling */
   .toast-notification {
-    position: absolute;
-    bottom: 20px;
+    position: fixed; /* Use fixed to ensure it's always visible within the popup's viewport */
+    bottom: 16px; /* Adjust as needed */
     left: 50%;
-    transform: translateX(-50%);
-    padding: 8px 16px;
-    background-color: var(--dark-bg-secondary);
-    border-left: 4px solid var(--accent-primary);
-    border-radius: 4px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    transform: translateX(-50%) translateY(100%); /* Start off-screen */
+    min-width: 200px;
+    padding: 10px 16px;
+    border-radius: 6px;
+    box-shadow: 0 6px 15px rgba(0, 0, 0, 0.3);
+    color: var(--dark-text-primary);
+    font-size: 0.875rem; /* 14px */
+    z-index: 1000;
     opacity: 0;
-    transition: opacity 0.3s ease, transform 0.3s ease;
+    transition: opacity 0.3s ease, transform 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
+    text-align: center;
   }
   
   .toast-notification.show {
@@ -202,14 +260,58 @@
   
   .toast-notification.hide {
     opacity: 0;
-    transform: translateX(-50%) translateY(10px);
+    transform: translateX(-50%) translateY(100%);
+  }
+
+  .toast-success {
+    background-color: #059669; /* Tailwind green-600 */ 
+    border-left: 4px solid #047857; /* Tailwind green-700 */
+  }
+
+  .toast-error {
+    background-color: #dc2626; /* Tailwind red-600 */
+    border-left: 4px solid #b91c1c; /* Tailwind red-700 */
   }
   
-  /* Hover effect for buttons */
+  /* General Hover/Active effect for buttons */
   button:not([disabled]) {
-    transition: transform 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
+    transition: transform 0.15s ease, background-color 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
   }
   
+  button:not([disabled]):hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    opacity: 0.92;
+  }
+
   button:not([disabled]):active {
-    transform: scale(0.98);
+    transform: scale(0.97) translateY(0px);
+    opacity: 1;
+  }
+
+  /* Specific hover for Ask button (already has gradient) */
+  #askButtonApp:not([disabled]):hover {
+    opacity: 1; /* Keep gradient fully opaque */
+    /* transform handled by existing .ask-button:hover .icon */
+  }
+
+  /* Refresh button animation */
+  #refreshBtnApp.refreshing svg {
+    animation: spin 1s linear infinite;
+  }
+
+  @keyframes spin {
+    from {
+      transform: rotate(0deg);
+    }
+    to {
+      transform: rotate(360deg);
+    }
+  }
+  
+  /* Ensure result card hover is distinct */
+  .result-card-dark:hover {
+    background-color: var(--dark-bg-tertiary); /* Slightly lighter than slate-800 for hover */
+    transform: translateY(-2px) scale(1.01);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25);
   }

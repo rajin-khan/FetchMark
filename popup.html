@@ -15,9 +15,9 @@
     <div id="appContainer" class="flex flex-col h-full">
 
         <!-- == ONBOARDING VIEW == -->
-        <div id="onboardingView" class="flex-grow flex flex-col p-6 space-y-6 hidden animate-fade-in">
+        <div id="onboardingView" class="flex-grow flex flex-col p-6 space-y-6 hidden view-animate-fade-in overflow-hidden relative">
             <!-- Step 1 -->
-            <div id="onboardingStep1" class="flex-grow flex flex-col justify-between">
+            <div id="onboardingStep1" class="onboarding-step visible-step flex-grow flex flex-col justify-between">
                 <div>
                     <div class="flex items-center space-x-2 mb-6">
                         <img src="assets/logo.svg" alt="FetchMark Logo" class="w-8 h-8 drop-shadow-md">
@@ -38,7 +38,7 @@
             </div>
             
             <!-- Step 2 -->
-            <div id="onboardingStep2" class="flex-grow flex flex-col justify-between hidden">
+            <div id="onboardingStep2" class="onboarding-step hidden-step flex-grow flex flex-col justify-between">
                 <div>
                     <div class="flex items-center space-x-2 mb-6">
                         <img src="assets/logo.svg" alt="FetchMark Logo" class="w-8 h-8 drop-shadow-md">
@@ -56,7 +56,7 @@
         </div>
 
         <!-- == MAIN APP VIEW == -->
-        <div id="mainAppView" class="flex flex-col h-full p-4 hidden animate-fade-in">
+        <div id="mainAppView" class="flex flex-col h-full p-4 hidden view-animate-fade-in">
             <!-- Header -->
             <div class="flex justify-between items-center mb-4 flex-shrink-0">
                 <div class="flex items-center space-x-2">
@@ -117,7 +117,7 @@
         </div>
 
         <!-- == SETTINGS VIEW == -->
-        <div id="settingsView" class="flex flex-col h-full p-4 hidden animate-fade-in">
+        <div id="settingsView" class="flex flex-col h-full p-4 hidden view-animate-fade-in">
             <!-- Settings Header -->
             <div class="flex justify-between items-center mb-6 flex-shrink-0">
                 <div class="flex items-center space-x-2">
@@ -133,16 +133,28 @@
             <!-- Settings Content -->
             <div class="flex-grow overflow-y-auto custom-scrollbar-dark">
                 <div class="space-y-6">
-                    <!-- API Key Section -->
+                    <!-- API Settings Section -->
                     <div class="bg-slate-800 rounded-lg p-4 shadow-md">
-                        <h2 class="text-lg font-semibold text-slate-100 mb-3">API Settings</h2>
-                        <div class="space-y-4">
+                        <h2 class="text-lg font-semibold text-slate-100 mb-3">AI Provider Settings</h2>
+                        
+                        <!-- Search Provider Selector -->
+                        <div class="mb-4">
+                            <label for="searchProviderSelect" class="block text-sm font-medium text-slate-300 mb-2">Search Provider</label>
+                            <select id="searchProviderSelect" class="w-full px-3 py-2 border border-slate-700 rounded-md bg-slate-800 text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500 shadow-sm transition">
+                                <option value="groq">Groq (Llama 3, Mixtral)</option>
+                                <option value="hf">Hugging Face (Embeddings)</option>
+                                <option value="ollama">Ollama (Local Embeddings)</option>
+                            </select>
+                        </div>
+
+                        <!-- Groq Settings -->
+                        <div id="groqSettingsDiv" class="space-y-4">
                             <div>
-                                <label for="groqApiKey" class="block text-sm font-medium text-slate-300 mb-2">Groq API Key</label>
+                                <label for="settingsGroqApiKey" class="block text-sm font-medium text-slate-300 mb-2">Groq API Key</label>
                                 <div class="flex">
-                                    <input type="password" id="groqApiKey" placeholder="gsk_..." class="flex-grow px-3 py-2 border border-slate-700 rounded-l-md bg-slate-800 text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent shadow-sm transition">
-                                    <button id="toggleKeyVisibilityBtn" class="px-3 py-2 bg-slate-700 rounded-r-md border border-slate-700 hover:bg-slate-600 transition-colors">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <input type="password" id="settingsGroqApiKey" placeholder="gsk_..." class="flex-grow px-3 py-2 border border-slate-700 rounded-l-md bg-slate-800 text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent shadow-sm transition">
+                                    <button id="toggleGroqKeyVisibilityBtn" class="px-3 py-2 bg-slate-700 rounded-r-md border border-l-0 border-slate-700 hover:bg-slate-600 transition-colors">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                                         </svg>
@@ -150,6 +162,31 @@
                                 </div>
                                 <p class="text-xs text-slate-500 mt-1">Get a free key at <a href="https://console.groq.com/keys" target="_blank" class="text-cyan-400 hover:underline">console.groq.com</a></p>
                             </div>
+                        </div>
+
+                        <!-- Hugging Face Settings -->
+                        <div id="hfSettingsDiv" class="space-y-4 hidden">
+                            <div>
+                                <label for="settingsHfApiKey" class="block text-sm font-medium text-slate-300 mb-2">Hugging Face API Key (Optional)</label>
+                                <div class="flex">
+                                    <input type="password" id="settingsHfApiKey" placeholder="hf_..." class="flex-grow px-3 py-2 border border-slate-700 rounded-l-md bg-slate-800 text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent shadow-sm transition">
+                                     <button id="toggleHfKeyVisibilityBtn" class="px-3 py-2 bg-slate-700 rounded-r-md border border-l-0 border-slate-700 hover:bg-slate-600 transition-colors">
+                                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                                    </button>
+                                </div>
+                                <p class="text-xs text-slate-500 mt-1">For potentially higher rate limits. Get a "Read" token from <a href="https://huggingface.co/settings/tokens" target="_blank" class="text-cyan-400 hover:underline">huggingface.co</a>.</p>
+                            </div>
+                        </div>
+
+                        <!-- Ollama Settings -->
+                        <div id="ollamaSettingsDiv" class="space-y-4 hidden">
+                            <div>
+                                <label for="settingsOllamaModel" class="block text-sm font-medium text-slate-300 mb-2">Ollama Model Name</label>
+                                <input type="text" id="settingsOllamaModel" placeholder="e.g., mistral, minilm" class="w-full px-3 py-2 border border-slate-700 rounded-md bg-slate-800 text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent shadow-sm transition">
+                                <p class="text-xs text-slate-500 mt-1">Ensure Ollama is running and the model is pulled (e.g., `ollama pull mistral`).</p>
+                            </div>
+                            <button id="testOllamaBtn" class="w-full mt-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-100 rounded-md font-medium transition-colors duration-200 text-sm">Test Ollama Connection</button>
+                            <p id="ollamaTestResultMsg" class="text-xs text-slate-400 mt-1 text-center"></p>
                         </div>
                     </div>
 
